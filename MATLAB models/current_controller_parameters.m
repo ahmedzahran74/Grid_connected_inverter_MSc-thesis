@@ -1,0 +1,10 @@
+Kpi=9.65;
+Kii=0.0307;
+fs=50*10^3;
+%P_gain_voltage=0.148;
+%I_gain_voltage=123*10^-6;
+%P_gain_voltage=0.148/10;
+%I_gain_voltage=(81.2*10^-3)/4;
+P_gain_voltage=0.148;%*1.33;
+%I_gain_voltage=1.23*10^-3;
+I_gain_voltage=1.8226e-4;
