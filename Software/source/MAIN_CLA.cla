@@ -1,0 +1,77 @@
+//###########################################################################
+//
+// Made by Andras Futo
+// 2017 May.
+//
+//Intrinsics
+//The following intrinsics are supported:
+//float __meisqrtf32(float)
+//float __meinvf32(float)
+//float __mminf32(float, float)
+//float __mmaxf32(float, float)
+//void __mswapf(float, float)
+//short __mf32toi16r(float)
+//unsigned short __mf32toui16r(float)
+//float __mfracf32(float)
+//__mdebugstop()
+//__meallow()
+//__medis()
+//__msetflg(unsigned short, unsigned short)
+//__mnop()
+//
+//###########################################################################
+
+#include "MAIN_CLA.h"
+
+
+
+inline void CLA_PI_Control(CLA_PI_type *controlStruct){
+    controlStruct->y += controlStruct->x*controlStruct->I + (controlStruct->x-controlStruct->x_old)*controlStruct->AP;
+    controlStruct->y = __cla_fsat(controlStruct->y, controlStruct->max, controlStruct->min );
+    controlStruct->x_old = controlStruct->x;
+}
+
+Uint32 Task1_CNT;
+
+//Task 1 : CLA ADC ISR, starts on ADCINT1
+__interrupt void Cla1Task1 ( void )
+{
+
+    Task1_CNT++;
+}
+
+
+__interrupt void Cla1Task2 ( void )
+{
+
+}
+__interrupt void Cla1Task3 ( void )
+{
+
+}
+__interrupt void Cla1Task4 ( void )
+{
+
+}
+__interrupt void Cla1Task5 ( void )
+{
+
+}
+__interrupt void Cla1Task6 ( void )
+{
+
+}
+__interrupt void Cla1Task7 ( void )
+{
+
+}
+
+//Task 8: Started via software during CLA init, used to clear Cla1ToCpuMsgRAM.
+__interrupt void Cla1Task8 ( void )
+{
+    Uint32* Addr;
+    if(!Cla1ToCpuMsgRAM_cleared) for(Addr = (Uint32*) Cla1ToCpuMsgRAM_START; Addr< (Uint32*)Cla1ToCpuMsgRAM_END; Addr++) *Addr = 0;
+    Cla1ToCpuMsgRAM_cleared = 1;
+}
+
+

@@ -1,0 +1,191 @@
+#include "F2806x_Device.h"
+#include "inic.h"
+#include "bbx.h"
+#include "HiMon.h"
+#include "Term_defs.h"
+#include "math.h"
+#include "ADC.h"
+#include "CLA_shared.h"
+#include "CLA.h"
+
+/* Timer variables for 10ms 100ms and 1s tasks */
+Uint16 sw_timer_1ms;
+Uint16 sw_timer_10ms;
+Uint16 sw_timer_100ms;
+Uint16 sw_timer_1s;
+Uint16 start_time;
+
+Uint16 time_10ms;
+Uint16 time_100ms;
+Uint16 time_1000ms;
+
+/* Variables for task runtime measurements */
+Uint16 t10ms, t100ms;
+
+
+Uint32 ConversionCount;
+//Uint16 emode, ecim, eadat;
+
+uint16_t error_code = 0;
+
+void ISR_ILLEGAL(void);
+void error(Uint16 e_code);
+
+//###########################################################################
+// CLA ISRs: run when a specific task is finished.
+//###########################################################################
+Uint32 CLA_IT_CNT = 0;
+__interrupt void cla1_task1_isr( void)
+{
+        PieCtrlRegs.PIEACK.bit.ACK11 = 1;
+}
+
+__interrupt void cla1_task2_isr( void)
+{
+    //when this interrupt is started, adc_isr is already finished.
+    CLA_IT_CNT++;
+
+    bbx_trigger();
+
+    AdcRegs.ADCINTFLGCLR.bit.ADCINT2 = 1;     //Clear ADCINT2 flag reinitialize for next SOC
+    PieCtrlRegs.PIEACK.bit.ACK11 = 1;
+}
+
+__interrupt void cla1_task3_isr( void)
+{
+        PieCtrlRegs.PIEACK.bit.ACK11 = 1;
+}
+
+__interrupt void cla1_task4_isr( void)
+{
+        PieCtrlRegs.PIEACK.bit.ACK11 = 1;
+}
+
+__interrupt void cla1_task5_isr( void)
+{
+        PieCtrlRegs.PIEACK.bit.ACK11 = 1;
+}
+
+__interrupt void cla1_task6_isr( void)
+{
+        PieCtrlRegs.PIEACK.bit.ACK11 = 1;
+}
+
+__interrupt void cla1_task7_isr( void)
+{
+        PieCtrlRegs.PIEACK.bit.ACK11 = 1;
+}
+
+__interrupt void cla1_task8_isr( void)
+{
+        Cla1ToCpuMsgRAM_cleared = 2;        //test interrupt after RAM cleared
+        PieCtrlRegs.PIEACK.bit.ACK11 = 1;
+}
+
+//###########################################################################
+// CPU ADC ISR: starts immediately on ADCINT1, at the same time as Cla1Task1!
+//###########################################################################
+Uint16 cpu_timer_interrupt_running = 0;
+#pragma CODE_SECTION(cpu_timer1_isr, "ramfuncs");
+__interrupt void cpu_timer1_isr(void)				//1ms timer interrupt
+{
+  IER = M_INT1 | M_INT11; //enable INT1 (group 1.x, ADC), enable INT11 (CLA)     // Set global priority by adjusting IER
+  CpuTimer1Regs.TCR.bit.TIF = 1;  //clear interrupt flag. If the flag is 1 while "cpu_timer_interrupt_running", that means that the 1ms task has not been finished within 1ms.
+  cpu_timer_interrupt_running = 1;
+
+  EnableInterrupts();
+  //Begin actual interrupt
+
+  sw_timer_1ms++;
+  // Restore original state:
+  //
+  cpu_timer_interrupt_running = 0;
+  DINT;
+  //IER does not need to be restored, as it was automatically saved on stack by HW.
+}
+
+#pragma CODE_SECTION(adc_isr, "ramfuncs");
+__interrupt void  adc_isr(void)
+{
+
+/* Debug functions */
+//	GpioDataRegs.GPBSET.bit.GPIO33 = 1;  // szkópos futási idõ megfigyelésre
+
+	ConversionCount++;
+
+
+
+//  GpioDataRegs.GPBCLEAR.bit.GPIO33 = 1;
+  AdcRegs.ADCINTFLGCLR.bit.ADCINT1 = 1;		//Clear ADCINT1 flag reinitialize for next SOC
+  PieCtrlRegs.PIEACK.all = PIEACK_GROUP1;   // Acknowledge interrupt to PIE
+  //asm("NOP");
+  return;
+}
+
+interrupt void ISR_ILLEGAL(void)   // Illegal operation TRAP
+{
+  // Insert ISR Code here
+
+  // Next two lines for debug only to halt the processor here
+  // Remove after inserting ISR Code
+  asm("          ESTOP0");
+  for(;;);
+}
+
+void main(void) {
+	EALLOW;
+
+	DeviceInit();	// Device Life support & GPIO mux settings
+
+	// Enable ADCINT1 in PIE
+	IER |= M_INT1; 						// Enable CPU Interrupt 1
+	IER |= M_INT13; 					// Enable CPU Interrupt 13
+
+	PieCtrlRegs.PIEIER1.bit.INTx1 = 1;	// Enable INT 1.1 in the PIE
+	//PieCtrlRegs.PIEIER1.bit.INTx7 = 1;	// Enable TINT0 in the PIE: Group 1 interrupt 7
+
+	EINT;          						// Enable Global interrupt INTM
+	ERTM;          						// Enable Global realtime interrupt DBGM
+
+	InitTermVars();
+
+	for(;;)
+	{
+	        Serial_mng();
+	        bbx_background();
+
+    if ((signed)(sw_timer_1ms-time_10ms) > 0)
+    {
+      time_10ms = sw_timer_1ms + 10 - 1;	// megengedjuk, hogy csusszon a 10ms -os taszk -1, hogy tényleg 10ms-onként fusson, ha nem csúszik.
+      start_time = sw_timer_1ms;
+			sw_timer_10ms++;
+  	  /* Start of 10ms task */
+
+
+
+  	  /* End of 10ms task */
+      t10ms = sw_timer_1ms - start_time;
+    }
+    else if ((signed)(sw_timer_1ms-time_100ms) > 0)
+    {
+      time_100ms = sw_timer_1ms + 100 - 1;	// megengedjuk, hogy csusszon a 100ms -os taszk -1, hogy tényleg 100ms-onként fusson, ha nem csúszik.
+      start_time = sw_timer_1ms;
+      sw_timer_100ms++;
+  	  /* Start of 100ms task */
+
+
+	/* End of 100ms task */
+      t100ms = sw_timer_1ms - start_time;
+    }
+		else if ((signed)(sw_timer_1ms-time_1000ms) > 0)
+		{
+			sw_timer_1s++;
+			time_1000ms += 1000;
+  	  /* Start of 1s task */
+
+  	  /* End of 1s task */
+		}
+	}
+}
+
+
